@@ -2,3 +2,12 @@ __pycache__/
 *.pyc
 *.fits
 .ipynb_checkpoints/
+
+# Editor backup files
+*~
+.*.swp
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
