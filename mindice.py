@@ -1,12 +1,15 @@
 # mindice library, written by luisgdh
 # https://sites.google.com/site/luisgdh
 #
-# V 1.0
+# V 1.1
 # 
 # mindice(wl, flx, err, 'CO2.30', definitions = definitions)
+#
+# Changes:
+# 2026.03.23 Added an example code with a generic optical spectrum
+# 
 from matplotlib import pyplot as plt
 import numpy as np
-import json
 
 def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
             definitions = None):
@@ -224,24 +227,3 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
          return(EW)
 
 
-          
-
-         
-
-
-
-
-
-
-
-#Temporary code
-import pandas as pd
-wl  = pd.read_csv('/LG/data/BasesSt/BOSZ/bosz2024_wave_r5000.txt', header = None)
-wl  = np.array(wl[0])
-flx = pd.read_csv('/LG/data/BasesSt/BOSZ/r5000/m+0.00/bosz2024_mp_t3500_g+5.0_m+0.00_a+0.00_c+0.00_v2_r5000_resam.txt.gz',
-                  header = None, sep=' ', compression='gzip')
-flx = np.array(flx[0])
-
-
-with open('/LG/MEGA/programs/python/mindice_defs.json', 'r') as f:
-        definitions = json.load(f)
