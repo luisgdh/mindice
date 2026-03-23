@@ -1,0 +1,176 @@
+# mindice library, written by luisgdh
+# https://sites.google.com/site/luisgdh
+#
+# V 0.1
+# Goal is to measure equivalent widths in a spectrum, e. g.:
+# mindice(wl, flx, err, 'CO2.30')
+from matplotlib import pyplot as plt
+import numpy as np
+import json
+
+def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
+            definitions = definitions):
+    if len(wl) != len(flx):
+         raise ValueError(f'Wavelength and flux arrays must be the same length\n'+
+                          f'len(wl) = {len(wl)}, and len(flx) = {len(flx)}.')
+    if ind is None:
+         raise TypeError('You must provide an index to measure')
+
+    if (err is not None) and (len(wl) != len(err)):
+         raise ValueError(f'Wavelength, flux and error arrays must be the same length\n'+
+                          f'len(wl) = {len(wl)}, len(flx) = {len(flx)}, len(err) = {len(err)}.')
+
+    try:
+         wl  = np.array(wl)
+         flx = np.array(flx)
+         if err is not None:
+              err = np.array(err)
+    except:
+         raise ValueError(f'One of your objects (wl, flx, err) could not be converted to a numpy array.')
+
+    if not np.all(np.diff(wl) > 0):
+        raise ValueError('Wavelength array must be strictly increasing. '
+                         'Check for unsorted data or duplicate values.')
+
+    
+    if ind not in definitions:
+        raise KeyError(f"Index '{ind}' not found in definitions file.")
+    
+    line_def = definitions[ind]
+    cont_windows = line_def['continuum']
+
+    if len(cont_windows) < 2:
+         raise ValueError(f'Index {ind} has less than two bandpasses: {cont_windows}')
+    
+    feat_windows = line_def['feature']
+
+    all_boundaries = [val for window in (cont_windows + feat_windows) for val in window]
+
+    index_min = min(all_boundaries)
+    index_max = max(all_boundaries)
+
+    if (index_min < min(wl)) or  (index_max > max(wl)):
+         raise ValueError(f'Wavelength covers between {min(wl)} and {max(wl)}, but your\n'+
+                          f'index definitions go from {index_min} to {index_max}.')
+
+         
+    padding = (index_max - index_min)*0.2
+    mask = (wl>index_min-padding) & (wl<index_max+padding)
+    wl  = wl[mask]
+    flx = flx[mask]
+    if err is not None:
+         err = err[mask]
+
+
+    # Processing the bandpasses
+    bandpasses_x = []
+    bandpasses_y = []
+    for cont_window in cont_windows:
+         if len(cont_window) != 2:
+              raise ValueError(f'Bandpass {cont_window} has length {len(cont_window)}.')
+         bandpasses_x.append(np.mean(cont_window))
+         bandpasses_y.append(np.nanmean(flx[(wl>cont_window[0]) & (wl<cont_window[1])]))
+
+    bandpasses_x = np.array(bandpasses_x)
+    bandpasses_y = np.array(bandpasses_y)
+
+    #Fitting the continuum to normalize the bandpasses
+    coeffs = np.polyfit(bandpasses_x, bandpasses_y, coeff)
+    continuum_flux = np.polyval(coeffs, wl)
+    
+    if plot:
+        f, ax = plt.subplots(nrows = 2, ncols = 1, figsize = (15, 8))
+        ax[0].plot(wl, flx, ls = '-', color = 'k', alpha = 0.5)
+        ax[0].plot(wl, continuum_flux, ls = '--', color = 'k')
+        for cont_window in cont_windows:
+             pltmask = (wl>cont_window[0]) & (wl<cont_window[1])
+             ax[0].plot(wl[pltmask], flx[pltmask], ls = '-', color = 'r')
+        for feat_window in feat_windows:
+             ax[0].axvspan(feat_window[0], feat_window[1], color = 'b', alpha = 0.5)
+        for i in range(len(bandpasses_x)):
+             ax[0].plot(bandpasses_x[i], bandpasses_y[i], color = 'r', ls = None, marker = 'x', markersize = 15)
+
+    flx = flx/continuum_flux
+    if err is not None:
+         err = err/continuum_flux
+         EWe= 0
+
+    if plot:
+        ax[1].plot(wl, flx,    ls = '-',  color = 'k', alpha = 0.5)
+        ax[1].plot(wl, wl*0+1, ls = '--', color = 'k')
+        for cont_window in cont_windows:
+             pltmask = (wl>cont_window[0]) & (wl<cont_window[1])
+             ax[1].plot(wl[pltmask], flx[pltmask], ls = '-', color = 'r')
+
+    #finally, integrate to get the feature
+
+    EW = 0
+
+    for feat_window in feat_windows:
+        featmask = (wl>feat_window[0]) & (wl<feat_window[1])
+        w_feat = np.concatenate([
+           [feat_window[0]],
+           wl[featmask],
+           [feat_window[1]]   ])
+        f_feat = np.concatenate([
+           [np.interp(feat_window[0], wl, flx)],
+           flx[featmask],
+           [np.interp(feat_window[1], wl, flx)]  ])
+        EW += np.trapz(1-f_feat, w_feat)
+        if err is not None:
+             e_feat = np.concatenate([
+                  [np.interp(feat_window[0], wl, err)],
+                  err[featmask],
+                  [np.interp(feat_window[1], wl, err)]
+             ])
+             dw  = np.diff(w_feat)
+             EWe += np.sum(
+                  (dw**2) * (e_feat[:-1]**2 + e_feat[1:]**2) / 4)
+             
+        if plot:
+             ax[1].fill_between(w_feat, f_feat, 1, color = 'b', alpha = 0.5)
+
+    if err is not None:
+        EWe = np.sqrt(EWe)
+
+    if plot:#
+         if err is not None:
+              ax[0].set_title(f'{ind} = {round(EW,2)}$\pm${round(EWe,2)}')
+         else:
+              ax[0].set_title(f'{ind} = {round(EW,3)}')
+         f.subplots_adjust(hspace=0.)
+         ax[0].set_xticks([])
+         ax[1].set_xlabel('Wavelength ($\\AA$)')
+         ax[0].set_xlim(index_min-padding, index_max+padding)
+         ax[1].set_xlim(index_min-padding, index_max+padding)
+         ax[0].set_ylabel('Flux')
+         ax[1].set_ylabel('Norm. Flux')
+         plt.show()
+
+    if err is not None:
+         return(EW, EWe)
+    else:
+         return(EW)
+
+
+          
+
+         
+
+
+
+
+
+
+
+#Temporary code
+import pandas as pd
+wl  = pd.read_csv('/LG/data/BasesSt/BOSZ/bosz2024_wave_r5000.txt', header = None)
+wl  = np.array(wl[0])
+flx = pd.read_csv('/LG/data/BasesSt/BOSZ/r5000/m+0.00/bosz2024_ms_t8000_g+3.0_m+0.00_a+0.50_c-0.25_v1_r5000_resam.txt.gz',
+                  header = None, sep=' ', compression='gzip')
+flx = np.array(flx[0])
+
+
+with open('/LG/MEGA/programs/python/mindice_defs.json', 'r') as f:
+        definitions = json.load(f)
