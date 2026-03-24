@@ -1,13 +1,17 @@
 # mindice library, written by luisgdh
 # https://sites.google.com/site/luisgdh
+# contact: luisgdh@gmail.com
 #
-# V 1.1
+# V 1.3
 # 
 # mindice(wl, flx, err, 'CO2.30', definitions = definitions)
 #
 # Changes:
-# 2026.03.23 Added an example code with a generic optical spectrum
-# 
+# 1.1 2026.03.23 Added an example code with a generic optical spectrum.
+# 1.2 2026.03.24 Added an __init___.py file, to prevent having to import mindice.mindice.mindice.
+# 1.3 2026.03.24 Now taking the error of the continuum into consideration for the final error.
+#
+#
 from matplotlib import pyplot as plt
 import numpy as np
 
@@ -63,7 +67,14 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
        - Unit 'A': sum(delta_lambda * (1 - norm_flux))
        - Unit 'mag': -2.5 * log10(sum(flux_integral) / sum(window_widths))
     """
-    if definitions == None:
+
+    def get_poly_err(x, cov, coeffs):
+        order = len(coeffs) - 1
+        jacobian = np.array([x**i for i in range(order, -1, -1)]).T
+        var_c = np.sum(jacobian @ cov * jacobian, axis=1)
+        return var_c
+
+    if definitions is None:
          raise KeyError('Please provide definitions for the indices.')
     if len(wl) != len(flx):
          raise ValueError(f'Wavelength and flux arrays must be the same length\n'+
@@ -72,7 +83,7 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
          raise TypeError('You must provide an index to measure')
 
     if (err is not None) and (len(wl) != len(err)):
-         raise ValueError(f'Wavelength, flux and error arrays must be the same length\n'+
+         raise ValueError(f'Wavelength, flux and error arrays must be the same length:\n'+
                           f'len(wl) = {len(wl)}, len(flx) = {len(flx)}, len(err) = {len(err)}.')
 
     try:
@@ -80,8 +91,9 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
          flx = np.array(flx)
          if err is not None:
               err = np.array(err)
-    except:
-         raise ValueError(f'One of your objects (wl, flx, err) could not be converted to a numpy array.')
+    except Exception as e:
+         raise ValueError('One of your objects (wl, flx, err) could not be converted'+
+                          ' to a numpy array.') from e
 
     if not np.all(np.diff(wl) > 0):
         raise ValueError('Wavelength array must be strictly increasing. '
@@ -127,17 +139,33 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
     # Processing the bandpasses
     bandpasses_x = []
     bandpasses_y = []
+    bandpasses_e = []
     for cont_window in cont_windows:
          if len(cont_window) != 2:
               raise ValueError(f'Bandpass {cont_window} has length {len(cont_window)}.')
+         window_mask = (wl>cont_window[0]) & (wl<cont_window[1])
+         n_pix       = np.sum(window_mask)
+
+         if n_pix == 0:
+             raise ValueError(f"No data points found in continuum window {cont_window}")
+         
          bandpasses_x.append(np.mean(cont_window))
-         bandpasses_y.append(np.nanmean(flx[(wl>cont_window[0]) & (wl<cont_window[1])]))
+         bandpasses_y.append(np.nanmean(flx[window_mask]))
+         if err is not None:
+             var_mean = np.nanmean(err[window_mask]**2) / n_pix
+             bandpasses_e.append(var_mean)
 
     bandpasses_x = np.array(bandpasses_x)
     bandpasses_y = np.array(bandpasses_y)
+    if err is not None:
+        bandpasses_e = np.sqrt(np.array(bandpasses_e))
 
     #Fitting the continuum to normalize the bandpasses
-    coeffs = np.polyfit(bandpasses_x, bandpasses_y, coeff)
+    if err is not None:
+        weights = 1.0/bandpasses_e 
+        coeffs, cov = np.polyfit(bandpasses_x, bandpasses_y, coeff, w=weights, cov=True)
+    else:
+        coeffs = np.polyfit(bandpasses_x, bandpasses_y, coeff)
     continuum_flux = np.polyval(coeffs, wl)
     
     if plot:
@@ -150,7 +178,8 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
         for feat_window in feat_windows:
              ax[0].axvspan(feat_window[0], feat_window[1], color = 'b', alpha = 0.5)
         for i in range(len(bandpasses_x)):
-             ax[0].plot(bandpasses_x[i], bandpasses_y[i], color = 'r', ls = None, marker = 'x', markersize = 15)
+             ax[0].plot(bandpasses_x[i], bandpasses_y[i], color = 'r', ls = None,
+                        marker = 'x', markersize = 15)
 
     flx = flx/continuum_flux
     if err is not None:
@@ -181,14 +210,16 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
         total_flux_int += np.trapz(f_feat, w_feat)
         total_width += (feat_window[1] - feat_window[0])
         if err is not None:
-             e_feat = np.concatenate([
-                  [np.interp(feat_window[0], wl, err)],
-                  err[featmask],
-                  [np.interp(feat_window[1], wl, err)]
-             ])
-             dw  = np.diff(w_feat)
-             var_total_int += np.sum((dw**2) * (e_feat[:-1]**2 + e_feat[1:]**2) / 4)
-             
+            e_feat = np.concatenate([
+                 [np.interp(feat_window[0], wl, err)],
+                 err[featmask],
+                 [np.interp(feat_window[1], wl, err)]
+            ])
+            dw  = np.diff(w_feat)
+            var_cont_feat = get_poly_err(w_feat, cov, coeffs)
+            fc_feat = np.interp(w_feat, wl, continuum_flux)
+            var_feat_total = e_feat**2 + (f_feat**2 * (var_cont_feat / fc_feat**2))
+            var_total_int += np.sum((dw**2) * (var_feat_total[:-1] + var_feat_total[1:]) / 4)         
         if plot:
              ax[1].fill_between(w_feat, f_feat, 1, color = 'b', alpha = 0.5)
 
