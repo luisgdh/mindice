@@ -1,0 +1,12 @@
+.gitignore
+LICENSE
+NGC1052.spec
+README
+example.py
+setup.py
+mindice/__init__.py
+mindice/core.py
+mindice.egg-info/PKG-INFO
+mindice.egg-info/SOURCES.txt
+mindice.egg-info/dependency_links.txt
+mindice.egg-info/top_level.txt

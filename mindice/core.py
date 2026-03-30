@@ -2,7 +2,7 @@
 # https://sites.google.com/site/luisgdh
 # contact: luisgdh@gmail.com
 #
-# V 1.3
+# V 1.4
 # 
 # mindice(wl, flx, err, 'CO2.30', definitions = definitions)
 #
@@ -10,9 +10,10 @@
 # 1.1 2026.03.23 Added an example code with a generic optical spectrum.
 # 1.2 2026.03.24 Added an __init___.py file, to prevent having to import mindice.mindice.mindice.
 # 1.3 2026.03.24 Now taking the error of the continuum into consideration for the final error.
-#
+# 1.4 2026.03.30 Organized the folder, so that "definitions" file is automatically loaded only once.
 #
 from matplotlib import pyplot as plt
+from . import DEFAULT_DEFINITIONS
 import numpy as np
 
 def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
@@ -75,7 +76,8 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
         return var_c
 
     if definitions is None:
-         raise KeyError('Please provide definitions for the indices.')
+         definitions = DEFAULT_DEFINITIONS
+     
     if len(wl) != len(flx):
          raise ValueError(f'Wavelength and flux arrays must be the same length\n'+
                           f'len(wl) = {len(wl)}, and len(flx) = {len(flx)}.')
@@ -253,8 +255,8 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
          plt.show()
 
     if err is not None:
-         return(EW, EWe)
+         return(float(EW), float(EWe))
     else:
-         return(EW)
+         return(float(EW))
 
 
