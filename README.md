@@ -29,19 +29,19 @@ mindice(spec[0], spec[1], ind = 'Hb', plot = True)
 ### Parameters:
 -----------
 wl : array-like
-    Wavelength array (must be strictly increasing).
+    Wavelength array (must be strictly increasing).  
 flx : array-like
-    Flux array, same length as wl.
+    Flux array, same length as wl.  
 err : array-like, optional
     1-sigma error array for flux. If provided, the function returns 
-    propagated uncertainties (EWe).
+    propagated uncertainties (EWe).  
 ind : str
-    The name of the index to measure (must exist in definitions).
+    The name of the index to measure (must exist in definitions).  
 coeff : int, default 1
-    The degree of the polynomial fit for the continuum (1 = linear).
+    The degree of the polynomial fit for the continuum (1 = linear).  
 plot : bool, default False
     If True, generates a two-panel diagnostic plot showing the 
-    continuum fit and the integrated feature regions.
+    continuum fit and the integrated feature regions.  
 definitions : dict
     A dictionary containing index definitions. 
     Format: {'IndexName': {'unit': 'A' or 'mag', 
@@ -52,7 +52,7 @@ Returns:
 --------
 EW : float
     The measured index value. For unit='A', this is the Equivalent Width. 
-    For unit='mag', this is the Lick-style magnitude.
+    For unit='mag', this is the Lick-style magnitude.  
 EWe : float (only if err is provided)
     The 1-sigma uncertainty of the measurement, propagated through 
     the trapezoidal integration.
