@@ -1,17 +1,9 @@
-# mindice library, written by luisgdh
-# https://sites.google.com/site/luisgdh
-# contact: luisgdh@gmail.com
-#
-# V 1.4
-# 
-# mindice(wl, flx, err, 'CO2.30', definitions = definitions)
-#
-# Changes:
-# 1.1 2026.03.23 Added an example code with a generic optical spectrum.
-# 1.2 2026.03.24 Added an __init___.py file, to prevent having to import mindice.mindice.mindice.
-# 1.3 2026.03.24 Now taking the error of the continuum into consideration for the final error.
-# 1.4 2026.03.30 Organized the folder, so that "definitions" file is automatically loaded only once.
-#
+"""
+mindice: A library for measuring spectral indices.
+Author: Luis Gabriel Dahmer Hahn
+Contact: luisgdh@gmail.com
+"""
+
 from matplotlib import pyplot as plt
 from . import DEFAULT_DEFINITIONS
 import numpy as np
