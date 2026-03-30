@@ -5,6 +5,19 @@ across multiple user-defined bandpasses and integrates the flux within
 specified feature windows. It supports both Angstrom (EW) and Magnitude 
 (Lick-style) units, handling multiple feature bands for a single index.
 
+In order to INSTALL, run:
+$ git clone https://github.com/luisgdh/mindice/
+$ cd mindice
+$ pip install -e .
+
+How to run:
+from mindice import mindice
+mindice(wl, flx, err=None, ind=None, coeff=1, plot=False, definitions=None)
+
+Example:
+spec    = np.loadtxt('NGC1052.spec', unpack = True)
+mindice(spec[0], spec[1], ind = 'Hb', plot = True)
+
 Parameters:
 -----------
 wl : array-like
