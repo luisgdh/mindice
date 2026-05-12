@@ -9,7 +9,7 @@ def get_version():
                 return line.split("=")[1].strip().strip('"').strip("'")
 setup(
     name="mindice",
-    version=get_version()
+    version=get_version(),
     packages=find_packages(),
     include_package_data=True,
     install_requires=[
