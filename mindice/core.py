@@ -61,7 +61,7 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
        - Unit 'mag': -2.5 * log10(sum(flux_integral) / sum(window_widths))
     """
 
-    def get_poly_err(x, cov, coeffs):
+    def get_poly_var(x, cov, coeffs):
         order = len(coeffs) - 1
         jacobian = np.array([x**i for i in range(order, -1, -1)]).T
         var_c = np.sum(jacobian @ cov * jacobian, axis=1)
@@ -143,23 +143,22 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
          if n_pix == 0:
              raise ValueError(f"No data points found in continuum window {cont_window}")
          
-         bandpasses_x.append(np.mean(cont_window))
-         bandpasses_y.append(np.nanmean(flx[window_mask]))
+         bandpasses_x.extend(wl[window_mask])
+         bandpasses_y.extend(flx[window_mask])
          if err is not None:
-             var_mean = np.nanmean(err[window_mask]**2) / n_pix
-             bandpasses_e.append(var_mean)
+             bandpasses_e.extend(err[window_mask])
 
     bandpasses_x = np.array(bandpasses_x)
     bandpasses_y = np.array(bandpasses_y)
     if err is not None:
-        bandpasses_e = np.sqrt(np.array(bandpasses_e))
+        bandpasses_e = np.array(bandpasses_e)
 
     #Fitting the continuum to normalize the bandpasses
     if err is not None:
         weights = 1.0/bandpasses_e 
-        coeffs, cov = np.polyfit(bandpasses_x, bandpasses_y, coeff, w=weights, cov=True)
     else:
-        coeffs = np.polyfit(bandpasses_x, bandpasses_y, coeff)
+        weights = None
+    coeffs, cov = np.polyfit(bandpasses_x, bandpasses_y, coeff, w=weights, cov=True)
     continuum_flux = np.polyval(coeffs, wl)
     
     if plot:
@@ -171,9 +170,6 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
              ax[0].plot(wl[pltmask], flx[pltmask], ls = '-', color = 'r')
         for feat_window in feat_windows:
              ax[0].axvspan(feat_window[0], feat_window[1], color = 'b', alpha = 0.5)
-        for i in range(len(bandpasses_x)):
-             ax[0].plot(bandpasses_x[i], bandpasses_y[i], color = 'r', ls = None,
-                        marker = 'x', markersize = 15)
 
     flx = flx/continuum_flux
     if err is not None:
@@ -210,7 +206,7 @@ def mindice(wl, flx, err = None, ind = None, coeff = 1, plot = False,
                  [np.interp(feat_window[1], wl, err)]
             ])
             dw  = np.diff(w_feat)
-            var_cont_feat = get_poly_err(w_feat, cov, coeffs)
+            var_cont_feat = get_poly_var(w_feat, cov, coeffs)
             fc_feat = np.interp(w_feat, wl, continuum_flux)
             var_feat_total = e_feat**2 + (f_feat**2 * (var_cont_feat / fc_feat**2))
             var_total_int += np.sum((dw**2) * (var_feat_total[:-1] + var_feat_total[1:]) / 4)         
